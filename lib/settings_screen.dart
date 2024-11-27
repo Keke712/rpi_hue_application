@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import '../LightApiService.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({Key? key}) : super(key: key);
@@ -8,63 +10,79 @@ class SettingsScreen extends StatefulWidget {
 }
 
 class _SettingsScreenState extends State<SettingsScreen> {
-  bool _darkMode = false;
-  double _fontSize = 16.0;
+  final LightApiService _lightService = LightApiService();
+  String? _connectedLamp;
+  TextEditingController _ipController = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    _loadSettings();
+  }
+
+  Future<void> _loadSettings() async {
+    setState(() {
+      _connectedLamp = 'Hue color lamp'; // Set identifier locally
+    });
+
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    _ipController.text = prefs.getString('baseUrl') ?? _lightService.baseUrl;
+  }
+
+  Future<void> _saveIpAddress() async {
+    final newUrl = _ipController.text;
+    if (newUrl.isNotEmpty) {
+      await _lightService.setBaseUrl(newUrl);
+      setState(() {
+        _connectedLamp = null; // Reset until fetched again
+      });
+      _loadSettings(); // Reload settings after changing base URL
+    }
+  }
+
+  @override
+  void dispose() {
+    _ipController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Settings'),
-      ),
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Appearance',
-              style: TextStyle(
-                fontSize: 20.0,
-                fontWeight: FontWeight.bold,
+      body: ListView(
+        children: [
+          ListTile(
+            leading: const Icon(Icons.lightbulb),
+            title: const Text('Lampe connectée'),
+            subtitle: Text(_connectedLamp ?? 'Chargement...'),
+          ),
+          ListTile(
+            leading: const Icon(Icons.settings_ethernet),
+            title: const Text('Adresse IP du serveur'),
+            subtitle: TextField(
+              controller: _ipController,
+              decoration: const InputDecoration(
+                hintText: 'http://192.168.x.x:5000',
               ),
+              keyboardType: TextInputType.url,
+              onSubmitted: (_) => _saveIpAddress(),
             ),
-            const SizedBox(height: 16.0),
-            SwitchListTile(
-              title: const Text('Dark Mode'),
-              value: _darkMode,
-              onChanged: (value) {
-                setState(() {
-                  _darkMode = value;
-                });
-              },
+            trailing: IconButton(
+              icon: const Icon(Icons.save),
+              onPressed: _saveIpAddress,
             ),
-            const SizedBox(height: 16.0),
-            const Text(
-              'Text Size',
-              style: TextStyle(
-                fontSize: 20.0,
-                fontWeight: FontWeight.bold,
-              ),
+          ),
+          ListTile(
+            leading: const Icon(Icons.brightness_6),
+            title: const Text('Thème'),
+            subtitle: Text(
+              Theme.of(context).brightness == Brightness.dark 
+                ? 'Sombre' 
+                : 'Clair'
             ),
-            const SizedBox(height: 16.0),
-            Slider(
-              value: _fontSize,
-              min: 12.0,
-              max: 24.0,
-              onChanged: (value) {
-                setState(() {
-                  _fontSize = value;
-                });
-              },
-            ),
-            const SizedBox(height: 16.0),
-            Text(
-              'Current Text Size: $_fontSize',
-              style: TextStyle(fontSize: _fontSize),
-            ),
-          ],
-        ),
+          ),
+          // Ajoutez d'autres paramètres ici selon vos besoins
+        ],
       ),
     );
   }
